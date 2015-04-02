@@ -3,8 +3,8 @@
 import           Control.Monad (mapM)
 import           Data.Array
 import           Data.Function (on)
-import qualified Data.Map      as Map
 import           Data.List     (foldl', maximumBy, minimumBy)
+import           Data.Map      (Map, fromList)
 import           Data.Tree
 
 import           Reflex
@@ -19,12 +19,12 @@ data Game = Game { piece :: Square, board :: Board }
 squares :: [Position]
 squares = [(x, y) | y <- [1..8], x <- [1..8]]
 
-buttonAttr' :: MonadWidget t m => Dynamic t (Map.Map String String) -> m (Event t ())
+buttonAttr' :: MonadWidget t m => Dynamic t (Map String String) -> m (Event t ())
 buttonAttr' attrs = do
   (e, _) <- elDynAttr' "button" attrs (text "")
   return $ _el_clicked e
 
-buttonAttr :: MonadWidget t m => String -> Map.Map String String -> m (Event t ())
+buttonAttr :: MonadWidget t m => String -> Map String String -> m (Event t ())
 buttonAttr s attrs = do
   (e, _) <- elAttr' "button" attrs (text s)
   return $ _el_clicked e
@@ -38,7 +38,7 @@ eSquare game coords = do
         White -> mkStyle "white") game
   return $ fmap (const (BlackMove coords)) b
     where
-      mkStyle c = Map.fromList
+      mkStyle c = fromList
         [ ("style", "background-color: " ++
           c ++ "; font-size: 40px; height: 85px; width: 85px") ]
 
@@ -54,14 +54,14 @@ mkMove _ g                            = g
 setup :: (MonadWidget t m) => m ()
 setup = el "div" $ do
   rec rows <- mapM (row g) [1..8]
-      b <- buttonAttr "move white" $ Map.fromList
+      b <- buttonAttr "move white" $ fromList
         [("style", "font-size: 2em; margin-left: 250px; margin-top: 20px")]
       let wm = fmap (const WhiteMove) b
       g    <- foldDyn mkMove newGame (leftmost (wm : concat rows))
   return ()
 
 main = mainWidget $ do
-  elAttr "div" (Map.fromList [("style", s)]) (text "Othello")
+  elAttr "div" (fromList [("style", s)]) (text "Othello")
   setup
   where
     s = "font-size: 60px; margin-left: 245px; font-family: Helvetica; color: steelblue"
