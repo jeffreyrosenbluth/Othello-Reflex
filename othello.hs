@@ -10,9 +10,23 @@ import           Data.Tree
 import           Reflex
 import           Reflex.Dom
 
+type Position = (Int, Int)
+
+data Input = BlackMove Position | WhiteMove
+
+data Game = Game { piece :: Square, board :: Board }
+
+squares :: [Position]
+squares = [(x, y) | y <- [1..8], x <- [1..8]]
+
 buttonAttr' :: MonadWidget t m => Dynamic t (Map.Map String String) -> m (Event t ())
 buttonAttr' attrs = do
   (e, _) <- elDynAttr' "button" attrs (text "")
+  return $ _el_clicked e
+
+buttonAttr :: MonadWidget t m => String -> Map.Map String String -> m (Event t ())
+buttonAttr s attrs = do
+  (e, _) <- elAttr' "button" attrs (text s)
   return $ _el_clicked e
 
 mkSquare :: (MonadWidget t m) => Dynamic t Game -> Position ->  m (Event t Position)
@@ -25,28 +39,31 @@ mkSquare game coords = do
   return $ fmap (const coords) b
     where
       mkStyle c = Map.fromList
-        [ ("style", "background-color: "
-         ++ c ++ "; font-size: 40px; height: 85px; width: 85px") ]
+        [ ("style", "background-color: " ++
+          c ++ "; font-size: 40px; height: 85px; width: 85px") ]
 
 mkRow :: (MonadWidget t m) => Dynamic t Game -> Int -> m [Event t Position]
 mkRow g n = el "div" $
   mapM (mkSquare g) (take 8 . drop (8 * (n-1)) $ squares)
 
-mkBoard :: (MonadWidget t m) => m ()
-mkBoard = el "div" $ do
+setup :: (MonadWidget t m) => m ()
+setup = el "div" $ do
   rec rows <- mapM (mkRow g) [1..8]
-      g    <- foldDyn mkMove newGame (leftmost . concat $ rows)
+      let bm = (map . fmap . fmap) BlackMove rows
+      b <- buttonAttr "Move White" $ Map.fromList
+        [("style", "font-size: 2em; margin-left: 250px; margin-top: 20px")]
+      let wm = fmap (const WhiteMove) b
+      g    <- foldDyn mkMove newGame (leftmost (wm : concat bm))
   return ()
 
-mkMove :: Position -> Game -> Game
-mkMove x g = if (piece g == White)
-             then aiMove 2 White g
-             else move x g
+mkMove :: Input -> Game -> Game
+mkMove (BlackMove x) g@(Game Black _) = move x g
+mkMove WhiteMove     g@(Game White _) = aiMove 2 White g
+mkMove _ g                            = g
 
-main = mainWidget $ el "div" $ do
-  mkBoard
-  b <- el "div" $ button "Play"
-  return ()
+main = mainWidget $ do
+  elAttr "div" (Map.fromList [("style", "font-size: 40px; margin-left: 280px")]) (text "Othello")
+  setup
 
 ----------------------------------------------------------------------
 -- Othello
@@ -55,18 +72,9 @@ main = mainWidget $ el "div" $ do
 data Square = Empty | Black | White
   deriving (Show, Eq)
 
-type Position = (Int, Int)
-
 type Line = [Position]
 
 type Board = Array Position Square
-
-type Move = Game -> Game
-
-data Game = Game { piece :: Square, board :: Board }
-
-squares :: [Position]
-squares = [(x, y) | y <- [1..8], x <- [1..8]]
 
 ----------------------------------------------------------------------
 -- Game Logic
