@@ -29,8 +29,8 @@ buttonAttr s attrs = do
   (e, _) <- elAttr' "button" attrs (text s)
   return $ _el_clicked e
 
-mkSquare :: (MonadWidget t m) => Dynamic t Game -> Position ->  m (Event t Input)
-mkSquare game coords = do
+eSquare :: (MonadWidget t m) => Dynamic t Game -> Position ->  m (Event t Input)
+eSquare game coords = do
   rec b <- buttonAttr' attrs
       attrs <- mapDyn (\r -> case ((board r) ! coords) of
         Empty -> mkStyle "green"
@@ -42,9 +42,9 @@ mkSquare game coords = do
         [ ("style", "background-color: " ++
           c ++ "; font-size: 40px; height: 85px; width: 85px") ]
 
-mkRow :: (MonadWidget t m) => Dynamic t Game -> Int -> m [Event t Input]
-mkRow g n = el "div" $
-  mapM (mkSquare g) (take 8 . drop (8 * (n-1)) $ squares)
+row :: (MonadWidget t m) => Dynamic t Game -> Int -> m [Event t Input]
+row g n = el "div" $
+  mapM (eSquare g) (take 8 . drop (8 * (n-1)) $ squares)
 
 mkMove :: Input -> Game -> Game
 mkMove (BlackMove x) g@(Game Black _) = move x g
@@ -53,20 +53,22 @@ mkMove _ g                            = g
 
 setup :: (MonadWidget t m) => m ()
 setup = el "div" $ do
-  rec rows <- mapM (mkRow g) [1..8]
-      b <- buttonAttr "Move White" $ Map.fromList
+  rec rows <- mapM (row g) [1..8]
+      b <- buttonAttr "move white" $ Map.fromList
         [("style", "font-size: 2em; margin-left: 250px; margin-top: 20px")]
       let wm = fmap (const WhiteMove) b
       g    <- foldDyn mkMove newGame (leftmost (wm : concat rows))
   return ()
 
 main = mainWidget $ do
-  elAttr "div" (Map.fromList [("style", "font-size: 40px; margin-left: 280px")]) (text "Othello")
+  elAttr "div" (Map.fromList [("style", s)]) (text "Othello")
   setup
+  where
+    s = "font-size: 60px; margin-left: 245px; font-family: Helvetica; color: steelblue"
 
-----------------------------------------------------------------------
+-------------------------------------------------------------------------------
 -- Othello
-----------------------------------------------------------------------
+-------------------------------------------------------------------------------
 
 data Square = Empty | Black | White
   deriving (Show, Eq)
@@ -75,13 +77,14 @@ type Line = [Position]
 
 type Board = Array Position Square
 
-----------------------------------------------------------------------
+-------------------------------------------------------------------------------
 -- Game Logic
-----------------------------------------------------------------------
+-------------------------------------------------------------------------------
 
 -- Memoize line calculations
 line :: Array (Int, Int, Int) Line
-line = array ((1, 1, 1), (8, 8, 8)) [((i, j, d), line' i j d) | i <- [1..8], j <- [1..8], d <- [1..8]]
+line = array ((1, 1, 1), (8, 8, 8))
+             [((i, j, d), line' i j d) | i <- [1..8], j <- [1..8], d <- [1..8]]
   where
     line' :: Int -> Int -> Int -> Line
     line' x y 1 = [(x, y + h)     | h <- [1..8], y+h <= 8]
@@ -170,9 +173,9 @@ findWinner b
     black = length $ filter (\s -> b ! s == Black) squares
     white = length $ filter (\s -> b ! s == White) squares
 
---------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------
 -- AI
---------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------
 
 -- Order the moves tried to maximize the benefit of alpha-beta pruning.
 abSquares :: [Position]
@@ -191,9 +194,9 @@ abSquares = reverse
 children :: Game -> [Game]
 children g@(Game p b) = map (\s -> move s g) (filter (isLegal b p) abSquares)
 
---------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------
 -- Minimax
---------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------
 type GameTree = Tree Game
 
 alphaBeta :: GameTree -> Double
@@ -222,13 +225,12 @@ aiMove n p g = move (snd best) g
     scores = map (\(g', s) -> (alphaBeta . gt $ g', s)) ms
     best = minimumBy (compare `on` fst) scores
 
--------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------
 -- Heuristic, based on:
 -- http://kartikkukreja.wordpress.com/2013/03/30/heuristic-function-for-reversiothello
---------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------
 
 -- Assign a score to a board based on the subsequent criteria.
--- See:
 -- http://courses.cs.washington.edu/courses/cse573/04au/Project/mini1/RUSSIA/Final_Paper.pdf
 heuristic :: Board -> Square -> Double
 heuristic b p =  10.0   * parity b p
