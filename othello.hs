@@ -29,37 +29,36 @@ buttonAttr s attrs = do
   (e, _) <- elAttr' "button" attrs (text s)
   return $ _el_clicked e
 
-mkSquare :: (MonadWidget t m) => Dynamic t Game -> Position ->  m (Event t Position)
+mkSquare :: (MonadWidget t m) => Dynamic t Game -> Position ->  m (Event t Input)
 mkSquare game coords = do
   rec b <- buttonAttr' attrs
       attrs <- mapDyn (\r -> case ((board r) ! coords) of
         Empty -> mkStyle "green"
         Black -> mkStyle "black"
         White -> mkStyle "white") game
-  return $ fmap (const coords) b
+  return $ fmap (const (BlackMove coords)) b
     where
       mkStyle c = Map.fromList
         [ ("style", "background-color: " ++
           c ++ "; font-size: 40px; height: 85px; width: 85px") ]
 
-mkRow :: (MonadWidget t m) => Dynamic t Game -> Int -> m [Event t Position]
+mkRow :: (MonadWidget t m) => Dynamic t Game -> Int -> m [Event t Input]
 mkRow g n = el "div" $
   mapM (mkSquare g) (take 8 . drop (8 * (n-1)) $ squares)
-
-setup :: (MonadWidget t m) => m ()
-setup = el "div" $ do
-  rec rows <- mapM (mkRow g) [1..8]
-      let bm = (map . fmap . fmap) BlackMove rows
-      b <- buttonAttr "Move White" $ Map.fromList
-        [("style", "font-size: 2em; margin-left: 250px; margin-top: 20px")]
-      let wm = fmap (const WhiteMove) b
-      g    <- foldDyn mkMove newGame (leftmost (wm : concat bm))
-  return ()
 
 mkMove :: Input -> Game -> Game
 mkMove (BlackMove x) g@(Game Black _) = move x g
 mkMove WhiteMove     g@(Game White _) = aiMove 2 White g
 mkMove _ g                            = g
+
+setup :: (MonadWidget t m) => m ()
+setup = el "div" $ do
+  rec rows <- mapM (mkRow g) [1..8]
+      b <- buttonAttr "Move White" $ Map.fromList
+        [("style", "font-size: 2em; margin-left: 250px; margin-top: 20px")]
+      let wm = fmap (const WhiteMove) b
+      g    <- foldDyn mkMove newGame (leftmost (wm : concat rows))
+  return ()
 
 main = mainWidget $ do
   elAttr "div" (Map.fromList [("style", "font-size: 40px; margin-left: 280px")]) (text "Othello")
