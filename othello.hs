@@ -39,7 +39,7 @@ eSquare game coords = do
   return $ fmap (const (BlackMove coords)) b
     where
       mkStyle c = Map.fromList
-        [ ("style", "background-color: " ++
+        [ ("style", "outline: none; background-color: " ++
           c ++ "; font-size: 40px; height: 85px; width: 85px") ]
 
 row :: (MonadWidget t m) => Dynamic t Game -> Int -> m [Event t Input]
