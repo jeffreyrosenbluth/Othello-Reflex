@@ -31,16 +31,17 @@ buttonAttr s attrs = do
 
 eSquare :: (MonadWidget t m) => Dynamic t Game -> Position ->  m (Event t Input)
 eSquare game coords = do
-  rec b <- buttonAttr' attrs
+  rec b     <- buttonAttr' attrs
       attrs <- mapDyn (\r -> case ((board r) ! coords) of
         Empty -> mkStyle "green"
         Black -> mkStyle "black"
         White -> mkStyle "white") game
   return $ fmap (const (BlackMove coords)) b
     where
-      mkStyle c = fromList
-        [ ("style", "background-color: " ++
-          c ++ "; font-size: 40px; height: 85px; width: 85px") ]
+
+      mkStyle c = Map.fromList
+        [ ("style", "outline: none; background-color: " ++
+          c ++ "; font-size: 40px; height: 60px; width: 60px") ]
 
 row :: (MonadWidget t m) => Dynamic t Game -> Int -> m [Event t Input]
 row g n = el "div" $
@@ -55,7 +56,7 @@ setup :: (MonadWidget t m) => m ()
 setup = el "div" $ do
   rec rows <- mapM (row g) [1..8]
       b <- buttonAttr "move white" $ fromList
-        [("style", "font-size: 2em; margin-left: 250px; margin-top: 20px")]
+        [("style", "font-size: 2em; margin-left: 150px; margin-top: 10px")]
       let wm = fmap (const WhiteMove) b
       g    <- foldDyn mkMove newGame (leftmost (wm : concat rows))
   return ()
@@ -64,7 +65,7 @@ main = mainWidget $ do
   elAttr "div" (fromList [("style", s)]) (text "Othello")
   setup
   where
-    s = "font-size: 60px; margin-left: 245px; font-family: Helvetica; color: steelblue"
+    s = "font-size: 50px; margin-left: 155px; font-family: Helvetica; color: steelblue"
 
 -------------------------------------------------------------------------------
 -- Othello
