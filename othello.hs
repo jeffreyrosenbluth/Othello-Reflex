@@ -39,7 +39,7 @@ eSquare game coords = do
   return $ fmap (const (BlackMove coords)) b
     where
 
-      mkStyle c = Map.fromList
+      mkStyle c = fromList
         [ ("style", "outline: none; background-color: " ++
           c ++ "; font-size: 40px; height: 60px; width: 60px") ]
 
