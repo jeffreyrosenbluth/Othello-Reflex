@@ -12,41 +12,57 @@ import           Reflex.Dom
 
 type Position = (Int, Int)
 
+data Square = Empty | Black | White
+  deriving (Show, Eq)
+
+type Board = Array Position Square
+
 data Input = BlackMove Position | WhiteMove
 
-data Game = Game { piece :: Square, board :: Board }
+data Game = Game { player :: Square, board :: Board }
 
 squares :: [Position]
 squares = [(x, y) | y <- [1..8], x <- [1..8]]
 
-buttonAttr' :: MonadWidget t m => Dynamic t (Map String String) -> m (Event t ())
-buttonAttr' attrs = do
+-------------------------------------------------------------------------------
+-- GUI
+-------------------------------------------------------------------------------
+
+-- | A button whose color is based on the game state.
+buttonDynAttr :: MonadWidget t m => Dynamic t (Map String String) -> m (Event t ())
+buttonDynAttr attrs = do
   (e, _) <- elDynAttr' "button" attrs (text "")
   return $ _el_clicked e
 
+-- | A button with attributes.
 buttonAttr :: MonadWidget t m => String -> Map String String -> m (Event t ())
 buttonAttr s attrs = do
   (e, _) <- elAttr' "button" attrs (text s)
   return $ _el_clicked e
 
-eSquare :: (MonadWidget t m) => Dynamic t Game -> Position ->  m (Event t Input)
-eSquare game coords = do
-  rec b     <- buttonAttr' attrs
+-- | A button widget representing a square on the othello board.
+--   The color of the square depends on the game state. Reports back
+--   the Position of the square when the black player clicks on it.
+squareWidget :: (MonadWidget t m) => Dynamic t Game -> Position ->  m (Event t Input)
+squareWidget gameDyn coords = do
+  rec b     <- buttonDynAttr attrs
       attrs <- mapDyn (\r -> case ((board r) ! coords) of
         Empty -> mkStyle "green"
         Black -> mkStyle "black"
-        White -> mkStyle "white") game
+        White -> mkStyle "white") gameDyn
   return $ fmap (const (BlackMove coords)) b
-    where
+  where
+    mkStyle c = fromList
+      [ ("style", "outline: none; background-color: " ++
+        c ++ "; font-size: 40px; height: 60px; width: 60px") ]
 
-      mkStyle c = fromList
-        [ ("style", "outline: none; background-color: " ++
-          c ++ "; font-size: 40px; height: 60px; width: 60px") ]
-
+-- | Get the nth row of squares from the list of squares.
 row :: (MonadWidget t m) => Dynamic t Game -> Int -> m [Event t Input]
 row g n = el "div" $
-  mapM (eSquare g) (take 8 . drop (8 * (n-1)) $ squares)
+  mapM (squareWidget g) (take 8 . drop (8 * (n-1)) $ squares)
 
+-- | Updates the Game based on the move made by the player (black) or the ai
+--   white.
 mkMove :: Input -> Game -> Game
 mkMove (BlackMove x) g@(Game Black _) = move x g
 mkMove WhiteMove     g@(Game White _) = aiMove 2 White g
@@ -61,6 +77,7 @@ setup = el "div" $ do
       g    <- foldDyn mkMove newGame (leftmost (wm : concat rows))
   return ()
 
+main :: IO ()
 main = mainWidget $ do
   elAttr "div" (fromList [("style", s)]) (text "Othello")
   setup
@@ -68,19 +85,10 @@ main = mainWidget $ do
     s = "font-size: 50px; margin-left: 155px; font-family: Helvetica; color: steelblue"
 
 -------------------------------------------------------------------------------
--- Othello
--------------------------------------------------------------------------------
-
-data Square = Empty | Black | White
-  deriving (Show, Eq)
-
-type Line = [Position]
-
-type Board = Array Position Square
-
--------------------------------------------------------------------------------
 -- Game Logic
 -------------------------------------------------------------------------------
+
+type Line = [Position]
 
 -- Memoize line calculations
 line :: Array (Int, Int, Int) Line
@@ -204,7 +212,7 @@ alphaBeta :: GameTree -> Double
 alphaBeta = go (-1/0) (1/0)
   where
     go :: Double -> Double -> GameTree -> Double
-    go _ _ (Node g []) = heuristic (board g) (piece g)
+    go _ _ (Node g []) = heuristic (board g) (player g)
     go a b (Node _ gs) = fst $ foldl' prune (a, b) gs
       where
         prune (a', b') n
@@ -349,5 +357,5 @@ mobility b p
     sup  = fromIntegral . length $ legalPositions g
     inf = fromIntegral . length $ legalPositions h
     g = Game p b
-    h = g { piece = opposite (piece g) }
+    h = g { player = opposite (player g) }
     total = sup + inf
