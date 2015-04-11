@@ -1,11 +1,16 @@
-{-# LANGUAGE RecursiveDo #-}
+{-# LANGUAGE RecursiveDo, DeriveGeneric, DeriveAnyClass #-}
 
+import           Control.Concurrent
+import           Control.DeepSeq
 import           Control.Monad (mapM)
+import           Control.Monad.IO.Class
 import           Data.Array
 import           Data.Function (on)
+import           GHC.Generics
 import           Data.List     (foldl', maximumBy, minimumBy)
 import           Data.Map      (Map, fromList)
 import           Data.Tree
+import           Data.Tuple
 
 import           Reflex
 import           Reflex.Dom
@@ -13,13 +18,13 @@ import           Reflex.Dom
 type Position = (Int, Int)
 
 data Square = Empty | Black | White
-  deriving (Show, Eq)
+  deriving (Show, Eq, Generic, NFData)
 
 type Board = Array Position Square
 
-data Input = BlackMove Position | WhiteMove
+data Input = BlackMove Position | WhiteMove Game deriving (Generic, NFData)
 
-data Game = Game { player :: Square, board :: Board }
+data Game = Game { player :: Square, board :: Board } deriving (Generic, NFData)
 
 squares :: [Position]
 squares = [(x, y) | y <- [1..8], x <- [1..8]]
@@ -65,16 +70,23 @@ row g n = el "div" $
 --   white.
 mkMove :: Input -> Game -> Game
 mkMove (BlackMove x) g@(Game Black _) = move x g
-mkMove WhiteMove     g@(Game White _) = aiMove 2 White g
+mkMove (WhiteMove g) _ = g -- We trust that the AI's moves will always be legal
 mkMove _ g                            = g
+
+computeAiMove :: MonadIO m => Game -> (Input -> IO ()) -> m ()
+computeAiMove g cb = liftIO $ do
+  forkIO $ do
+--    threadDelay 1000000 -- Add a delay here if necessary
+    cb $!! WhiteMove $ aiMove 4 White g -- Fully evaluate before triggering the callback
+  return ()
 
 setup :: (MonadWidget t m) => m ()
 setup = el "div" $ do
   rec rows <- mapM (row g) [1..8]
-      b <- buttonAttr "move white" $ fromList
-        [("style", "font-size: 2em; margin-left: 150px; margin-top: 10px")]
-      let wm = fmap (const WhiteMove) b
-      g    <- foldDyn mkMove newGame (leftmost (wm : concat rows))
+      let bm = leftmost (concat rows)
+      wm <- performEventAsync $ fmap computeAiMove $ ffilter ((==White) . player) $ attachWith (flip mkMove) (current g) bm
+      dynText =<< mapDyn ((++"'s move") . show . player) g
+      g <- foldDyn mkMove newGame (leftmost [wm, bm])
   return ()
 
 main :: IO ()
